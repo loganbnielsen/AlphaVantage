@@ -1,0 +1,5 @@
+data/
+.vscode
+tokens*
+__pycache__
+tmp*
