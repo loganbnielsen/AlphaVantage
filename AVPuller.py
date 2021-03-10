@@ -1,3 +1,7 @@
+import log
+import logging
+logger = logging.getLogger('root') 
+
 from alpha_vantage.timeseries import TimeSeries
 
 import os
@@ -47,7 +51,7 @@ class AVPuller():
             elif dtype == "stock" and freq == data_freq:
                 files.append(f)
             else:
-                print(f"file '{f}' did not meet criteria: ({dtype},{data_freq})")
+                logger.debug(f"file '{f}' did not meet criteria: ({dtype},{data_freq})")
         # read in files into a sigle dataframe  
         return pd.concat([pd.read_csv(path.join(self.save_dir,f),
                                       parse_dates=['date'])
@@ -68,7 +72,7 @@ class AVPuller():
                 frames.append(df)
                 self.tracker.update(1)
         except ValueError as e:
-            print(repr(e))
+            logger.warning(repr(e))
         return pd.concat(frames)
 
     def pull_tick_slice(self, tick, freq, desired_slice, adjusted):
@@ -93,7 +97,7 @@ class AVPuller():
         try:
             frames = [self.pull_tick_all_slices(tick, freq, adjusted) for tick in tickers]
         except ValueError as e:
-            print(repr(e))
+            logger.warning(repr(e))
         return pd.concat(frames)
 
     def pull_tick_all_slices(self, ticker, freq='15min', adjusted=True):
@@ -103,7 +107,7 @@ class AVPuller():
         try:
             frames = [self.pull_tick_slice(ticker, freq, desired_slice, adjusted) for desired_slice in slice_generator()]
         except ValueError as e:
-            print(repr(e))
+            logger.warning(repr(e))
         return pd.concat(frames)
 
     def pull_cryptos(self, cryptocurrencies, market="USD"):
@@ -118,7 +122,7 @@ class AVPuller():
                 frames.append(df)
                 self.tracker.update(1)
         except ValueError as e:
-            print(repr(e))
+            logger.warning(repr(e))
         return pd.concat(frames)
 
     def store_as_csv(self, df, crypto_market="USD"):
@@ -193,13 +197,13 @@ class Tracker():
                 time_left = timedelta(minutes=1) - time_elapsed # 1 minute is API cooldown time
                 active = time_left[time_left > timedelta(minutes=0)]
 
-                print(f"active: {active}")
+                logger.debug(f"active: {active}")
 
                 if len(active) >= self.limit:
                     sleep_time = min(active).total_seconds()
-                    print(f"sleeping for {sleep_time}...")
+                    logger.debug(f"sleeping for {sleep_time}...")
                     time.sleep(sleep_time)
-                    print("awake.")
+                    logger.debug("awake.")
                 else:
                     isAvailable = True
         else:
