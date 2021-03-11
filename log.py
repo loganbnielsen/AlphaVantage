@@ -9,4 +9,4 @@ def setup_custom_logger(name, loglevel):
     logger.setLevel(loglevel)
     logger.addHandler(handler)
     return logger
-log.setup_custom_logger('root', logging.DEBUG)
+setup_custom_logger('root', logging.DEBUG)

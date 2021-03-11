@@ -36,6 +36,29 @@ class AVPuller():
         meta["end"] = pd.to_datetime(meta["end"])
         return meta
 
+    def get_tickers(self):
+        ids = []
+        for f in os.listdir(self.save_dir):
+            split_f = re.split("[-\.]+", f)
+            ID = split_f[0]
+            if not ID in ["BTC", "ETH"]:
+                ids.append(ID)
+        ids = list(set(ids))
+        ids = sorted(ids)
+        return ids
+
+    def pull_tick_monthly(self, tick, adjusted=True):
+        self.tracker.wait()
+        ts = TimeSeries(key=self.key, output_format='pandas')
+        if adjusted:
+            df, meta_data = ts.get_monthly_adjusted(tick)
+        else:
+            df, meta_data = ts.get_monthly(tick)
+        df = df.reset_index()
+        df['ticker'] = tick
+        self.tracker.update(1)
+        return df
+
     def load_data(self, dtype="stock", data_freq="1min"):
         """
             loads all stored data of a particular class 
@@ -75,15 +98,29 @@ class AVPuller():
             logger.warning(repr(e))
         return pd.concat(frames)
 
+    def pull_tick_daily(self, tick, adjusted=True):
+        self.tracker.wait()
+        ts = TimeSeries(key=self.key, output_format='pandas')
+        if adjusted:
+            df, meta_data = ts.get_daily_adjusted(tick, "full")
+        else:
+            df, meta_data = ts.get_daily(tick, "full")
+        df = df.reset_index()
+        df['ticker'] = tick
+        self.tracker.update(1)
+        return df
+
     def pull_tick_slice(self, tick, freq, desired_slice, adjusted):
         """
             pulls a slice for a ticker
         """
+        logger.info(f"obtaining slice: ({tick},{freq},{desired_slice})")
         ts = TimeSeries(key=self.key, output_format='csv')
         self.tracker.wait()
         reader, meta_data = ts.get_intraday_extended(symbol=tick, interval=freq, slice=desired_slice) # TODO figure out what adjusted isn't accepted https://github.com/RomelTorres/alpha_vantage/blob/develop/alpha_vantage/timeseries.py
         content = [l for l in reader]
         df = pd.DataFrame(content[1:],columns=content[0])
+        logger.debug(f"df.columns: {df.columns}")
         df['time'] = pd.to_datetime(df['time'])
         df = df.rename({'time':'date'}, axis=1)
         df['ticker'] = tick
@@ -145,6 +182,8 @@ class AVPuller():
                 return "30min"
             elif delta_mode == timedelta(minutes=60):
                 return "60min"
+            elif delta_mode == timedelta(days=1):
+                return "daily"
             elif delta_mode == timedelta(days=7):
                 return "weekly"
             elif delta_mode == timedelta(days=31) or delta_mode == timedelta(days=30) or delta_mode == timedelta(days=28):
@@ -196,14 +235,12 @@ class Tracker():
                 time_elapsed = datetime.now() - l 
                 time_left = timedelta(minutes=1) - time_elapsed # 1 minute is API cooldown time
                 active = time_left[time_left > timedelta(minutes=0)]
-
                 logger.debug(f"active: {active}")
-
                 if len(active) >= self.limit:
                     sleep_time = min(active).total_seconds()
-                    logger.debug(f"sleeping for {sleep_time}...")
+                    logger.info(f"sleeping for {sleep_time}...")
                     time.sleep(sleep_time)
-                    logger.debug("awake.")
+                    logger.info("awake.")
                 else:
                     isAvailable = True
         else:
